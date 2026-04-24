@@ -1,0 +1,24 @@
+{
+  "name": "mmm-homeassistantstatusdashboard",
+  "version": "1.0.0",
+  "description": "MagicMirror² module: Home Assistant status dashboard with real-time alerting via WebSocket",
+  "main": "MMM-HomeAssistantStatusDashboard.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "setupFiles": ["<rootDir>/jest.setup.js"],
+    "moduleNameMapper": {
+      "^node_helper$": "<rootDir>/__mocks__/node_helper.js"
+    }
+  }
+}

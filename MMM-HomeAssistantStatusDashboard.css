@@ -1,0 +1,430 @@
+/* MMM-HomeAssistantStatusDashboard.css
+ * Glass-aesthetic dashboard matching the MMM-GlassCalendar visual language.
+ */
+
+/* ============================================================
+   Wrapper & Card
+   ============================================================ */
+
+.ha-dashboard-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.ha-dashboard-card {
+  position: relative;
+  width: 100%;
+  padding: 16px 20px 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 18px 45px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: radial-gradient(
+    circle at top left,
+    rgba(255, 255, 255, 0.12),
+    rgba(10, 15, 30, 0.93)
+  );
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  overflow: hidden;
+  color: #f1f5f9;
+}
+
+/* ============================================================
+   Shimmer
+   ============================================================ */
+
+.ha-shimmer {
+  position: absolute;
+  top: -40%;
+  left: -40%;
+  width: 140%;
+  height: 140%;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.02)
+  );
+  opacity: 0.2;
+  transform: translateX(-30%);
+  animation: ha-shimmer 18s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes ha-shimmer {
+  0%   { transform: translateX(-30%); }
+  50%  { transform: translateX(15%);  }
+  100% { transform: translateX(-30%); }
+}
+
+/* All content layers above shimmer */
+.ha-header,
+.ha-alert-banner,
+.ha-groups-container,
+.ha-loading,
+.ha-error,
+.ha-footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+
+.ha-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.ha-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e2e8f0;
+}
+
+.ha-title i {
+  color: #38bdf8;
+  margin-right: 5px;
+}
+
+.ha-connection-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ha-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ha-connected .ha-status-dot {
+  background: #22c55e;
+  box-shadow: 0 0 6px #22c55e;
+  animation: ha-pulse-green 2.5s ease-in-out infinite;
+}
+
+.ha-disconnected .ha-status-dot {
+  background: #ef4444;
+}
+
+@keyframes ha-pulse-green {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ============================================================
+   Alert Banner
+   ============================================================ */
+
+.ha-alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.22),
+    rgba(220, 38, 38, 0.12)
+  );
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  animation: ha-banner-breathe 3s ease-in-out infinite;
+}
+
+@keyframes ha-banner-breathe {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.45); box-shadow: none; }
+  50%       { border-color: rgba(239, 68, 68, 0.9);  box-shadow: 0 0 14px rgba(239, 68, 68, 0.3); }
+}
+
+.ha-alert-bell {
+  color: #fbbf24;
+  font-size: 1rem;
+  margin-top: 1px;
+  animation: ha-bell-shake 5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ha-bell-shake {
+  0%, 100%   { transform: rotate(0deg);   }
+  8%, 24%    { transform: rotate(-14deg); }
+  16%, 32%   { transform: rotate(14deg);  }
+  40%        { transform: rotate(0deg);   }
+}
+
+.ha-alert-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ha-alert-chip {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fca5a5;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+/* ============================================================
+   Group & Grid
+   ============================================================ */
+
+.ha-groups-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ha-group {
+  margin-bottom: 10px;
+}
+
+.ha-group-header {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+  margin-bottom: 7px;
+  padding-left: 3px;
+}
+
+.ha-entity-grid {
+  display: grid;
+  gap: 8px;
+}
+
+/* ============================================================
+   Entity Tiles
+   ============================================================ */
+
+.ha-entity-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  transition: background 0.25s, border-color 0.25s;
+  text-align: center;
+  min-height: 82px;
+  gap: 4px;
+  cursor: default;
+}
+
+/* State colour variants */
+
+.ha-state-active {
+  border-color: rgba(56, 189, 248, 0.32);
+}
+
+.ha-state-active .ha-tile-icon i {
+  color: #38bdf8;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+}
+
+.ha-state-inactive {
+  opacity: 0.6;
+}
+
+.ha-state-inactive .ha-tile-icon i {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.ha-state-unavailable {
+  opacity: 0.35;
+}
+
+.ha-state-unavailable .ha-tile-icon i {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.ha-state-warn {
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.ha-state-warn .ha-tile-icon i {
+  color: #f59e0b;
+  filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.5));
+}
+
+.ha-state-alert,
+.ha-tile-alert {
+  border-color: rgba(239, 68, 68, 0.65) !important;
+  background: rgba(239, 68, 68, 0.1) !important;
+  animation: ha-tile-pulse 2s ease-in-out infinite;
+}
+
+.ha-state-alert .ha-tile-icon i {
+  color: #ef4444;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));
+}
+
+@keyframes ha-tile-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);    }
+  50%       { box-shadow: 0 0 14px 2px rgba(239, 68, 68, 0.3); }
+}
+
+/* Tile content */
+
+.ha-tile-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.ha-tile-state {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #f1f5f9;
+  max-width: 92%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ha-tile-name {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.2;
+  max-width: 92%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Blinking alert dot in tile corner */
+
+.ha-alert-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+  animation: ha-dot-blink 1.2s step-end infinite;
+}
+
+@keyframes ha-dot-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ============================================================
+   Loading & Error
+   ============================================================ */
+
+.ha-loading {
+  padding: 22px 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.ha-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  animation: ha-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ha-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ha-error {
+  padding: 18px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: #fca5a5;
+}
+
+.ha-error i {
+  color: #ef4444;
+  margin-right: 7px;
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+
+.ha-footer {
+  margin-top: 10px;
+  text-align: right;
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.28);
+}
+
+/* ============================================================
+   Light theme
+   ============================================================ */
+
+.ha-theme-light .ha-dashboard-card {
+  background: radial-gradient(
+    circle at top left,
+    rgba(255, 255, 255, 0.95),
+    rgba(226, 232, 240, 0.92)
+  );
+  color: #0f172a;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.ha-theme-light .ha-title { color: #1e293b; }
+
+.ha-theme-light .ha-connection-status {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #475569;
+}
+
+.ha-theme-light .ha-group-header { color: rgba(0, 0, 0, 0.38); }
+
+.ha-theme-light .ha-entity-tile {
+  border-color: rgba(0, 0, 0, 0.09);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.ha-theme-light .ha-state-inactive { opacity: 0.5; }
+
+.ha-theme-light .ha-tile-state { color: #1e293b; }
+
+.ha-theme-light .ha-tile-name { color: rgba(0, 0, 0, 0.45); }
+
+.ha-theme-light .ha-footer { color: rgba(0, 0, 0, 0.28); }
