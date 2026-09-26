@@ -484,8 +484,9 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
       if (pair) return s === "on" ? pair[0] : pair[1];
     }
 
+    // Zero-width space lets "Heat/Cool" wrap at the slash in narrow tiles
     const known = {
-      heat_cool: "Heat/Cool", fan_only: "Fan", power_off: "Off",
+      heat_cool: "Heat/\u200bCool", fan_only: "Fan", power_off: "Off",
       not_home: "Away", armed_away: "Armed away", armed_home: "Armed home",
       armed_night: "Armed night", disarmed: "Disarmed"
     };

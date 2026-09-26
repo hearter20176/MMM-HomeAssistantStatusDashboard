@@ -168,7 +168,7 @@ describe("_formatState", () => {
   });
 
   test("known HA states get friendly labels", () => {
-    expect(mod._formatState({}, { state: "heat_cool", attributes: {} })).toBe("Heat/Cool");
+    expect(mod._formatState({}, { state: "heat_cool", attributes: {} })).toBe("Heat/\u200bCool");
     expect(mod._formatState({}, { state: "power_off", attributes: {} })).toBe("Off");
     expect(mod._formatState({}, { state: "not_home", attributes: {} })).toBe("Away");
   });

@@ -310,7 +310,7 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .ha-tile-name {
