@@ -101,6 +101,23 @@ describe("_getStateClass", () => {
   test("unrecognised state → inactive", () => {
     expect(mod._getStateClass({}, { state: "idle" })).toBe("ha-state-inactive");
   });
+
+  test("per-entity activeStates replace defaults", () => {
+    expect(mod._getStateClass({ activeStates: ["locked"] }, { state: "locked" })).toBe("ha-state-active");
+    expect(mod._getStateClass({ activeStates: ["locked"] }, { state: "on" })).toBe("ha-state-inactive");
+  });
+
+  test("activeStates match case-insensitively", () => {
+    expect(mod._getStateClass({ activeStates: ["Charging"] }, { state: "charging" })).toBe("ha-state-active");
+  });
+
+  test("per-entity warnStates take precedence over active", () => {
+    expect(mod._getStateClass({ warnStates: ["on"] }, { state: "on" })).toBe("ha-state-warn");
+  });
+
+  test("empty warnStates disables default warn states", () => {
+    expect(mod._getStateClass({ warnStates: [] }, { state: "pending" })).toBe("ha-state-inactive");
+  });
 });
 
 // ─── _formatState ─────────────────────────────────────────────────────────────
@@ -110,12 +127,16 @@ describe("_formatState", () => {
     expect(mod._formatState({}, null)).toBe("N/A");
   });
 
-  test('"unavailable" → N/A', () => {
-    expect(mod._formatState({}, { state: "unavailable" })).toBe("N/A");
+  test('"unavailable" → Offline', () => {
+    expect(mod._formatState({}, { state: "unavailable" })).toBe("Offline");
   });
 
-  test('"unknown" → ?', () => {
-    expect(mod._formatState({}, { state: "unknown" })).toBe("?");
+  test('"unknown" → Unknown', () => {
+    expect(mod._formatState({}, { state: "unknown" })).toBe("Unknown");
+  });
+
+  test("stateLabels override wins", () => {
+    expect(mod._formatState({ stateLabels: { on: "Replace" } }, { state: "on", attributes: {} })).toBe("Replace");
   });
 
   test("decimal numeric with HA unit attribute", () => {
@@ -141,8 +162,26 @@ describe("_formatState", () => {
     expect(mod._formatState({}, { state: "0", attributes: {} })).toBe("0");
   });
 
-  test("non-numeric state passed through verbatim", () => {
-    expect(mod._formatState({}, { state: "heating", attributes: {} })).toBe("heating");
+  test("lowercase state is capitalised with underscores spaced", () => {
+    expect(mod._formatState({}, { state: "heating", attributes: {} })).toBe("Heating");
+    expect(mod._formatState({}, { state: "top_load_rinse", attributes: {} })).toBe("Top load rinse");
+  });
+
+  test("known HA states get friendly labels", () => {
+    expect(mod._formatState({}, { state: "heat_cool", attributes: {} })).toBe("Heat/Cool");
+    expect(mod._formatState({}, { state: "power_off", attributes: {} })).toBe("Off");
+    expect(mod._formatState({}, { state: "not_home", attributes: {} })).toBe("Away");
+  });
+
+  test("mixed-case vendor state passed through verbatim", () => {
+    expect(mod._formatState({}, { state: "Fully Charged", attributes: {} })).toBe("Fully Charged");
+  });
+
+  test("binary_sensor uses device_class wording", () => {
+    const ec = { entity_id: "binary_sensor.leak" };
+    expect(mod._formatState(ec, { state: "off", attributes: { device_class: "moisture" } })).toBe("Dry");
+    expect(mod._formatState(ec, { state: "on", attributes: { device_class: "problem" } })).toBe("Problem");
+    expect(mod._formatState(ec, { state: "on", attributes: {} })).toBe("On");
   });
 
   test("value rounded to 1 decimal place", () => {
@@ -158,17 +197,17 @@ describe("_formatState", () => {
 
   test("attribute falls back to state when key is absent", () => {
     const state = { state: "on", attributes: {} };
-    expect(mod._formatState({ attribute: "effect" }, state)).toBe("on");
+    expect(mod._formatState({ attribute: "effect" }, state)).toBe("On");
   });
 
   test("attribute falls back to state when value is empty string", () => {
     const state = { state: "on", attributes: { effect: "" } };
-    expect(mod._formatState({ attribute: "effect" }, state)).toBe("on");
+    expect(mod._formatState({ attribute: "effect" }, state)).toBe("On");
   });
 
   test("attribute falls back to state when value is null", () => {
     const state = { state: "on", attributes: { effect: null } };
-    expect(mod._formatState({ attribute: "effect" }, state)).toBe("on");
+    expect(mod._formatState({ attribute: "effect" }, state)).toBe("On");
   });
 
   test("attribute coerces non-string values to string", () => {

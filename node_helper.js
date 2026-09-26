@@ -15,12 +15,17 @@ module.exports = NodeHelper.create({
     this.msgId = 1;
     this.reconnectTimer = null;
     this.stopping = false;
+    this.heartbeatTimer = null;
+    this.awaitingPong = false;
+    this.entityIds = null;  // Set of configured entity_ids; null = forward everything
   },
 
   socketNotificationReceived(notification, payload) {
     if (notification === "HA_CONNECT") {
       this.cfg = payload;
       this.stopping = false;
+      const ids = Array.isArray(payload.entityIds) ? payload.entityIds : [];
+      this.entityIds = ids.length ? new Set(ids) : null;
       this._connect();
     }
   },
@@ -62,6 +67,7 @@ module.exports = NodeHelper.create({
       if (this.ws !== ws) return;  // stale socket
       console.log(`[MMM-HomeAssistantStatusDashboard] WebSocket closed (${code})`);
       this.ws = null;
+      this._stopHeartbeat();
       this.sendSocketNotification("HA_DISCONNECTED", {});
       if (!this.stopping) this._scheduleReconnect();
     });
@@ -93,6 +99,11 @@ module.exports = NodeHelper.create({
 
         // Subscribe to state_changed events for real-time updates
         this._send({ id: this.msgId++, type: "subscribe_events", event_type: "state_changed" });
+        this._startHeartbeat();
+        break;
+
+      case "pong":
+        this.awaitingPong = false;
         break;
 
       case "auth_invalid":
@@ -104,7 +115,10 @@ module.exports = NodeHelper.create({
       case "result":
         if (msg.success && Array.isArray(msg.result)) {
           // This is the get_states response
-          this.sendSocketNotification("HA_STATES", { states: msg.result });
+          const states = this.entityIds
+            ? msg.result.filter(s => s && this.entityIds.has(s.entity_id))
+            : msg.result;
+          this.sendSocketNotification("HA_STATES", { states });
         } else if (!msg.success) {
           console.warn("[MMM-HomeAssistantStatusDashboard] Command failed:", msg.error);
         }
@@ -114,6 +128,8 @@ module.exports = NodeHelper.create({
         const event = msg.event;
         if (!event || event.event_type !== "state_changed" || !event.data) break;
         const { entity_id, new_state, old_state } = event.data;
+        // Only forward entities the dashboard shows; HA emits thousands of changes an hour
+        if (this.entityIds && !this.entityIds.has(entity_id)) break;
         this.sendSocketNotification("HA_STATE_CHANGED", { entity_id, new_state, old_state });
         break;
       }
@@ -129,6 +145,33 @@ module.exports = NodeHelper.create({
     }
   },
 
+  // A Wi-Fi drop can leave a half-open TCP socket that never fires 'close'.
+  // Ping HA periodically and force a reconnect if a pong doesn't come back.
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    const interval = (this.cfg && this.cfg.heartbeatInterval) || 30000;
+    this.heartbeatTimer = setInterval(() => {
+      if (this.awaitingPong) {
+        console.warn("[MMM-HomeAssistantStatusDashboard] No pong from HA; reconnecting");
+        this._stopHeartbeat();
+        if (this.ws) {
+          try { this.ws.terminate(); } catch (_) {}
+        }
+        return;
+      }
+      this.awaitingPong = true;
+      this._send({ id: this.msgId++, type: "ping" });
+    }, interval);
+  },
+
+  _stopHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    this.awaitingPong = false;
+  },
+
   _scheduleReconnect() {
     if (this.reconnectTimer) return;
     const delay = (this.cfg && this.cfg.reconnectInterval) || 10000;
@@ -141,6 +184,7 @@ module.exports = NodeHelper.create({
 
   stop() {
     this.stopping = true;
+    this._stopHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

@@ -96,23 +96,7 @@ npm install
 
 ### Font Awesome
 
-Icons require Font Awesome 6. Place (or symlink) the FA distribution inside the module:
-
-```
-MMM-HomeAssistantStatusDashboard/
-  lib/
-    fontawesome/
-      css/
-        all.min.css
-      webfonts/
-        ...
-```
-
-If you already have MMM-GlassCalendar installed you can symlink:
-
-```bash
-ln -s ../MMM-GlassCalendar/lib/fontawesome lib/fontawesome
-```
+Icons use the Font Awesome build that ships with MagicMirror² (`font-awesome.css`, currently FA 7 free), so no extra install is needed. Use free `fa-solid` / `fa-regular` icon names.
 
 ---
 
@@ -260,6 +244,8 @@ ln -s ../MMM-GlassCalendar/lib/fontawesome lib/fontawesome
 | `showConnectionStatus` | boolean | `true` | Connection dot + HA version in header |
 | `theme` | string | `"dark"` | `"dark"` or `"light"` |
 | `reconnectInterval` | number | `10000` | ms between reconnect attempts after disconnect |
+| `heartbeatInterval` | number | `30000` | ms between WebSocket pings; a missed pong forces a reconnect (recovers from silent Wi-Fi drops) |
+| `renderDebounce` | number | `1000` | ms to coalesce bursts of state changes into one redraw |
 | `animationSpeed` | number | `400` | DOM transition speed in ms |
 
 ### Entity config object
@@ -276,6 +262,9 @@ ln -s ../MMM-GlassCalendar/lib/fontawesome lib/fontawesome
 | `alertLabel` | string | | Text shown in alert banner and MM alert instead of raw state (e.g. `"OPEN"`) |
 | `unit` | string | | Unit suffix override; falls back to HA `unit_of_measurement` attribute |
 | `attribute` | string | | HA attribute to display as the tile value instead of the raw state (e.g. `"effect"` to show a light's current scene/theme). Alert conditions and the active/inactive colour class still use the main entity state. Falls back to the raw state if the attribute is absent or empty. |
+| `activeStates` | string[] | | States shown as active (blue); replaces the built-in list for this entity (e.g. `["locked"]`). Case-insensitive |
+| `warnStates` | string[] | | States shown as warning (amber); replaces the built-in list. `[]` disables warn for the entity |
+| `stateLabels` | object | | Map of raw state to display text, e.g. `{ "on": "Replace" }`; overrides the built-in labels |
 
 ---
 

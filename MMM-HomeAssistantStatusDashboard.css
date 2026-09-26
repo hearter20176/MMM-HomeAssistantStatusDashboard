@@ -223,6 +223,7 @@
 
 .ha-entity-tile {
   position: relative;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -299,14 +300,17 @@
 }
 
 .ha-tile-state {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.1;
   color: #f1f5f9;
-  max-width: 92%;
+  max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Wrap long states ("Fully Charged", "1.8 pCi/L") onto two lines instead of truncating */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .ha-tile-name {

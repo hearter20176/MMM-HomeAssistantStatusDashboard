@@ -40,6 +40,10 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     theme: "dark",
 
     reconnectInterval: 10000,
+    // Ping HA this often; a missed pong forces a reconnect (half-open sockets)
+    heartbeatInterval: 30000,
+    // Coalesce bursts of state changes into one redraw
+    renderDebounce: 1000,
     animationSpeed: 400
   },
 
@@ -48,11 +52,8 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
   // ---------------------------------------------------------------------------
 
   getStyles() {
-    return [
-      "MMM-HomeAssistantStatusDashboard.css",
-      // Font Awesome — place in lib/fontawesome/ or update the path
-      this.file("lib/fontawesome/css/all.min.css")
-    ];
+    // MagicMirror's vendored Font Awesome (7.x free, "fa-solid" classes)
+    return ["font-awesome.css", "MMM-HomeAssistantStatusDashboard.css"];
   },
 
   // ---------------------------------------------------------------------------
@@ -67,12 +68,16 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     this.lastUpdated = null;
     this.error = null;
     this.loaded = false;
+    this.renderTimer = null;
+    this.entityIds = new Set(this.config.entities.map(ec => ec.entity_id));
 
     if (this.config.haUrl && this.config.token) {
       this.sendSocketNotification("HA_CONNECT", {
         haUrl: this.config.haUrl,
         token: this.config.token,
-        reconnectInterval: this.config.reconnectInterval
+        reconnectInterval: this.config.reconnectInterval,
+        heartbeatInterval: this.config.heartbeatInterval,
+        entityIds: [...this.entityIds]
       });
     } else {
       this.error = "haUrl and token must be configured.";
@@ -104,6 +109,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
 
       case "HA_STATE_CHANGED": {
         const entityId = payload.entity_id;
+        if (!this.entityIds.has(entityId)) break;
         const oldHaState = this.states[entityId];
         const newHaState = payload.new_state;
 
@@ -133,7 +139,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
           delete this.states[entityId];
         }
         this.lastUpdated = new Date();
-        this.updateDom(0);
+        this._scheduleRender();
         break;
       }
 
@@ -145,6 +151,15 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
         }
         break;
     }
+  },
+
+  // Several entities often change together (a scene, an HA restart); redraw once
+  _scheduleRender() {
+    if (this.renderTimer) return;
+    this.renderTimer = setTimeout(() => {
+      this.renderTimer = null;
+      this.updateDom(0);
+    }, this.config.renderDebounce);
   },
 
   // ---------------------------------------------------------------------------
@@ -280,7 +295,8 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
 
       const grid = document.createElement("div");
       grid.className = "ha-entity-grid";
-      grid.style.gridTemplateColumns = `repeat(${this.config.tilesPerRow}, 1fr)`;
+      // minmax(0, …) keeps columns equal; plain 1fr lets long states widen a column
+      grid.style.gridTemplateColumns = `repeat(${this.config.tilesPerRow}, minmax(0, 1fr))`;
 
       entities.forEach(ec => {
         const state = this.states[ec.entity_id];
@@ -322,6 +338,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     const stateEl = document.createElement("div");
     stateEl.className = "ha-tile-state";
     stateEl.textContent = this._formatState(entityConfig, state);
+    stateEl.title = state ? state.state : "";
     tile.appendChild(stateEl);
 
     // Name label
@@ -401,15 +418,20 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     if (s === "unavailable" || s === "unknown") return "ha-state-unavailable";
     if (this._isAlertState(entityConfig, state)) return "ha-state-alert";
 
-    const activeStates = new Set([
-      "on", "open", "unlocked", "playing", "heating", "cooling",
-      "fan_only", "drying", "home", "detected", "active", "armed_away",
-      "armed_home", "armed_night", "true"
-    ]);
-    if (activeStates.has(s)) return "ha-state-active";
+    // Per-entity lists replace the defaults (warnStates: [] disables warn)
+    const lower = s.toLowerCase();
+    const matches = list => list.some(v => String(v).toLowerCase() === lower);
+    const warnStates = Array.isArray(entityConfig.warnStates)
+      ? entityConfig.warnStates
+      : ["opening", "closing", "pending", "arming", "triggered"];
+    if (matches(warnStates)) return "ha-state-warn";
 
-    const warnStates = new Set(["opening", "closing", "pending", "arming", "triggered"]);
-    if (warnStates.has(s)) return "ha-state-warn";
+    const activeStates = Array.isArray(entityConfig.activeStates)
+      ? entityConfig.activeStates
+      : ["on", "open", "unlocked", "playing", "heating", "cooling",
+        "fan_only", "drying", "home", "detected", "active", "armed_away",
+        "armed_home", "armed_night", "true"];
+    if (matches(activeStates)) return "ha-state-active";
 
     return "ha-state-inactive";
   },
@@ -417,8 +439,11 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
   _formatState(entityConfig, state) {
     if (!state) return "N/A";
     const s = state.state;
-    if (s === "unavailable") return "N/A";
-    if (s === "unknown") return "?";
+    if (entityConfig.stateLabels && entityConfig.stateLabels[s] != null) {
+      return String(entityConfig.stateLabels[s]);
+    }
+    if (s === "unavailable") return "Offline";
+    if (s === "unknown") return "Unknown";
 
     // Show a specific attribute (e.g. "effect" for a light's current scene)
     if (entityConfig.attribute) {
@@ -434,7 +459,42 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
       return unit ? `${formatted}\u202f${unit}` : String(formatted);
     }
 
-    return s;
+    return this._humanizeState(entityConfig.entity_id, s, state.attributes || {});
+  },
+
+  // Turn raw HA states ("heat_cool", "power_off", binary "on") into display text
+  _humanizeState(entityId, s, attributes) {
+    const domain = (entityId || "").split(".")[0];
+
+    if (domain === "binary_sensor" && (s === "on" || s === "off")) {
+      const byClass = {
+        door: ["Open", "Closed"], garage_door: ["Open", "Closed"],
+        window: ["Open", "Closed"], opening: ["Open", "Closed"],
+        moisture: ["Wet", "Dry"], problem: ["Problem", "OK"],
+        connectivity: ["Online", "Down"], running: ["Running", "Idle"],
+        motion: ["Motion", "Clear"], occupancy: ["Occupied", "Clear"],
+        presence: ["Home", "Away"], smoke: ["Smoke", "Clear"],
+        gas: ["Gas", "Clear"], carbon_monoxide: ["CO", "Clear"],
+        safety: ["Unsafe", "Safe"], tamper: ["Tampered", "Clear"],
+        battery: ["Low", "Normal"], lock: ["Unlocked", "Locked"],
+        plug: ["Plugged in", "Unplugged"], power: ["Power", "No power"],
+        update: ["Update", "Current"]
+      };
+      const pair = byClass[attributes.device_class];
+      if (pair) return s === "on" ? pair[0] : pair[1];
+    }
+
+    const known = {
+      heat_cool: "Heat/Cool", fan_only: "Fan", power_off: "Off",
+      not_home: "Away", armed_away: "Armed away", armed_home: "Armed home",
+      armed_night: "Armed night", disarmed: "Disarmed"
+    };
+    if (known[s]) return known[s];
+
+    // Leave mixed-case vendor strings ("Fully Charged") alone
+    if (s !== s.toLowerCase()) return s;
+    const text = s.replace(/_/g, " ");
+    return text.charAt(0).toUpperCase() + text.slice(1);
   },
 
   _getDomainIcon(entityId, attributes) {
@@ -462,7 +522,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
       problem: "fa-solid fa-triangle-exclamation",
       safety: "fa-solid fa-shield-halved",
       sound: "fa-solid fa-volume-high",
-      tamper: "fa-solid fa-shield-exclamation",
+      tamper: "fa-solid fa-shield-halved",
       vibration: "fa-solid fa-wave-square",
       lock: "fa-solid fa-lock",
       energy: "fa-solid fa-bolt",
@@ -487,7 +547,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
       light: "fa-solid fa-lightbulb",
       climate: "fa-solid fa-temperature-half",
       lock: "fa-solid fa-lock",
-      cover: "fa-solid fa-blinds",
+      cover: "fa-solid fa-window-maximize",
       media_player: "fa-solid fa-tv",
       person: "fa-solid fa-person",
       device_tracker: "fa-solid fa-location-dot",

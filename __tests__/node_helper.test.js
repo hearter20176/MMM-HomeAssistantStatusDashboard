@@ -28,6 +28,8 @@ beforeEach(() => {
   helper.stopping = false;
 });
 
+afterEach(() => { helper._stopHeartbeat(); });
+
 // ─── _handleMessage ───────────────────────────────────────────────────────────
 
 describe("_handleMessage", () => {
@@ -161,5 +163,52 @@ describe("_connect", () => {
     helper.msgId = 99;
     helper._connect();
     expect(helper.msgId).toBe(1);
+  });
+});
+
+// ─── entity filtering & heartbeat ────────────────────────────────────────────
+
+describe("entity filtering", () => {
+  afterEach(() => { helper.entityIds = null; });
+
+  test("HA_CONNECT with entityIds limits forwarded states", () => {
+    helper._connect = jest.fn();
+    helper.socketNotificationReceived("HA_CONNECT", { ...helper.cfg, entityIds: ["sensor.a"] });
+    const states = [{ entity_id: "sensor.a", state: "1" }, { entity_id: "sensor.b", state: "2" }];
+    helper._handleMessage(JSON.stringify({ type: "result", success: true, result: states }));
+    expect(helper.sendSocketNotification).toHaveBeenCalledWith("HA_STATES", { states: [states[0]] });
+    delete helper._connect;
+  });
+
+  test("state_changed for an unconfigured entity is dropped", () => {
+    helper.entityIds = new Set(["sensor.a"]);
+    helper._handleMessage(JSON.stringify({
+      type: "event",
+      event: { event_type: "state_changed", data: { entity_id: "sensor.b", new_state: {}, old_state: {} } }
+    }));
+    expect(helper.sendSocketNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe("heartbeat", () => {
+  beforeEach(() => { jest.useFakeTimers(); });
+  afterEach(() => { helper._stopHeartbeat(); jest.useRealTimers(); });
+
+  test("pings on each interval and clears on pong", () => {
+    helper.cfg.heartbeatInterval = 1000;
+    helper._startHeartbeat();
+    jest.advanceTimersByTime(1000);
+    expect(helper._send).toHaveBeenCalledWith(expect.objectContaining({ type: "ping" }));
+    helper._handleMessage(JSON.stringify({ type: "pong" }));
+    expect(helper.awaitingPong).toBe(false);
+  });
+
+  test("missed pong terminates the socket", () => {
+    const ws = { terminate: jest.fn() };
+    helper.ws = ws;
+    helper.cfg.heartbeatInterval = 1000;
+    helper._startHeartbeat();
+    jest.advanceTimersByTime(2000);
+    expect(ws.terminate).toHaveBeenCalled();
   });
 });
