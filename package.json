@@ -18,7 +18,8 @@
     "testEnvironment": "node",
     "setupFiles": ["<rootDir>/jest.setup.js"],
     "moduleNameMapper": {
-      "^node_helper$": "<rootDir>/__mocks__/node_helper.js"
+      "^node_helper$": "<rootDir>/__mocks__/node_helper.js",
+      "^logger$": "<rootDir>/__mocks__/logger.js"
     }
   }
 }

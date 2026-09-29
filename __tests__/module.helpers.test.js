@@ -268,3 +268,143 @@ describe("_getDomainIcon", () => {
       .toBe("fa-solid fa-toggle-on");
   });
 });
+
+// ─── _isEntityHidden (hideUnavailable) ────────────────────────────────────────
+
+describe("_isEntityHidden", () => {
+  test("hideUnavailable off never hides", () => {
+    mod.config = { hideUnavailable: false };
+    expect(mod._isEntityHidden(null)).toBe(false);
+    expect(mod._isEntityHidden({ state: "unavailable" })).toBe(false);
+  });
+
+  test("hideUnavailable hides a missing state", () => {
+    mod.config = { hideUnavailable: true };
+    expect(mod._isEntityHidden(null)).toBe(true);
+  });
+
+  test("hideUnavailable hides HA-reported unavailable", () => {
+    mod.config = { hideUnavailable: true };
+    expect(mod._isEntityHidden({ state: "unavailable" })).toBe(true);
+  });
+
+  test("hideUnavailable hides HA-reported unknown", () => {
+    mod.config = { hideUnavailable: true };
+    expect(mod._isEntityHidden({ state: "unknown" })).toBe(true);
+  });
+
+  test("hideUnavailable does not hide a normal state", () => {
+    mod.config = { hideUnavailable: true };
+    expect(mod._isEntityHidden({ state: "on" })).toBe(false);
+  });
+});
+
+// ─── _buildEntityGroups ────────────────────────────────────────────────────────
+
+describe("_buildEntityGroups", () => {
+  test("hidden entities are not rendered as tiles", () => {
+    mod.config = { hideUnavailable: true, entities: [{ entity_id: "sensor.a", group: "G" }], groupOrder: [], tilesPerRow: 3 };
+    mod.states = { "sensor.a": { state: "unavailable", attributes: {} } };
+    const container = mod._buildEntityGroups();
+    expect(container.querySelectorAll(".ha-entity-tile").length).toBe(0);
+  });
+
+  test("a group left with zero visible tiles is not rendered", () => {
+    mod.config = { hideUnavailable: true, entities: [{ entity_id: "sensor.a", group: "G" }], groupOrder: [], tilesPerRow: 3 };
+    mod.states = { "sensor.a": { state: "unavailable", attributes: {} } };
+    const container = mod._buildEntityGroups();
+    expect(container.querySelectorAll(".ha-group").length).toBe(0);
+  });
+
+  test("no configured entities shows an empty-state message", () => {
+    mod.config = { hideUnavailable: false, entities: [], groupOrder: [], tilesPerRow: 3 };
+    mod.states = {};
+    const container = mod._buildEntityGroups();
+    expect(container.textContent).toMatch(/No entities configured/);
+  });
+
+  test("all entities hidden shows an empty-state message distinct from no entities", () => {
+    mod.config = { hideUnavailable: true, entities: [{ entity_id: "sensor.a", group: "G" }], groupOrder: [], tilesPerRow: 3 };
+    mod.states = {};
+    const container = mod._buildEntityGroups();
+    expect(container.textContent).toMatch(/All entities hidden/);
+  });
+
+  test("visible entities are still rendered normally", () => {
+    mod.config = { hideUnavailable: true, entities: [{ entity_id: "sensor.a", group: "G" }], groupOrder: [], tilesPerRow: 3 };
+    mod.states = { "sensor.a": { state: "on", attributes: {} } };
+    const container = mod._buildEntityGroups();
+    expect(container.querySelectorAll(".ha-entity-tile").length).toBe(1);
+  });
+});
+
+// ─── _buildEntityTile — malformed entity_id ───────────────────────────────────
+
+describe("_buildEntityTile", () => {
+  test("entity_id without a dot falls back to the whole id instead of throwing", () => {
+    const tile = mod._buildEntityTile({ entity_id: "front_door" }, null);
+    const nameEl = tile.querySelector(".ha-tile-name");
+    expect(nameEl.textContent).toBe("front door");
+  });
+});
+
+// ─── start() — defensive config normalization ─────────────────────────────────
+
+describe("start()", () => {
+  test("non-array entities config is normalized to an empty array", () => {
+    mod.config = { entities: "not-an-array", haUrl: "", token: "" };
+    mod.sendSocketNotification = jest.fn();
+    mod.start();
+    expect(mod.config.entities).toEqual([]);
+  });
+
+  test("entries missing a string entity_id are filtered out", () => {
+    mod.config = {
+      entities: [{ entity_id: "sensor.a" }, { name: "no id" }, null, { entity_id: 5 }],
+      haUrl: "",
+      token: ""
+    };
+    mod.sendSocketNotification = jest.fn();
+    mod.start();
+    expect(mod.config.entities).toEqual([{ entity_id: "sensor.a" }]);
+  });
+});
+
+// ─── socketNotificationReceived — HA_ERROR after first load ───────────────────
+
+describe("HA_ERROR after the module has already loaded", () => {
+  test("re-renders instead of staying silent", () => {
+    mod.loaded = true;
+    mod.error = null;
+    mod.updateDom = jest.fn();
+    mod.config = { animationSpeed: 400 };
+    mod.socketNotificationReceived("HA_ERROR", { message: "token revoked" });
+    expect(mod.error).toBe("token revoked");
+    expect(mod.updateDom).toHaveBeenCalled();
+  });
+});
+
+// ─── getDom — error after states already loaded ───────────────────────────────
+
+describe("getDom with an error but existing states", () => {
+  test("shows a compact error strip instead of replacing the dashboard", () => {
+    mod.loaded = true;
+    mod.connected = false;
+    mod.error = "Connection lost";
+    mod.states = { "sensor.a": { state: "on", attributes: {} } };
+    mod.config = {
+      theme: "dark",
+      entities: [{ entity_id: "sensor.a", group: "G" }],
+      groupOrder: [],
+      tilesPerRow: 3,
+      hideUnavailable: false,
+      showAlertBanner: false,
+      showConnectionStatus: false,
+      showLastUpdated: false,
+      header: "Home"
+    };
+    const wrapper = mod.getDom();
+    expect(wrapper.querySelector(".ha-error-strip")).not.toBeNull();
+    expect(wrapper.querySelectorAll(".ha-entity-tile").length).toBe(1);
+  });
+});

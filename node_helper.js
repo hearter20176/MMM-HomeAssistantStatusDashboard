@@ -5,11 +5,12 @@
 
 const NodeHelper = require("node_helper");
 const WebSocket = require("ws");
+const Log = require("logger");
 
 module.exports = NodeHelper.create({
 
   start() {
-    console.log("[MMM-HomeAssistantStatusDashboard] node_helper started");
+    Log.log("[MMM-HomeAssistantStatusDashboard] node_helper started");
     this.ws = null;
     this.cfg = null;
     this.msgId = 1;
@@ -18,12 +19,14 @@ module.exports = NodeHelper.create({
     this.heartbeatTimer = null;
     this.awaitingPong = false;
     this.entityIds = null;  // Set of configured entity_ids; null = forward everything
+    this.authFailed = false;  // true once HA rejects our token — terminal, no reconnect
   },
 
   socketNotificationReceived(notification, payload) {
     if (notification === "HA_CONNECT") {
       this.cfg = payload;
       this.stopping = false;
+      this.authFailed = false;
       const ids = Array.isArray(payload.entityIds) ? payload.entityIds : [];
       this.entityIds = ids.length ? new Set(ids) : null;
       this._connect();
@@ -36,18 +39,18 @@ module.exports = NodeHelper.create({
 
   _connect() {
     if (this.ws) {
-      try { this.ws.terminate(); } catch (_) {}
+      try { this.ws.terminate(); } catch (_) { /* socket may already be closed */ }
       this.ws = null;
     }
 
-    const url = this.cfg.haUrl.replace(/^https?/, ws => ws === "https" ? "wss" : "ws") + "/api/websocket";
-    console.log("[MMM-HomeAssistantStatusDashboard] Connecting:", url);
+    const url = `${this.cfg.haUrl.replace(/^https?/, ws => ws === "https" ? "wss" : "ws")}/api/websocket`;
+    Log.log("[MMM-HomeAssistantStatusDashboard] Connecting to Home Assistant");
 
     let ws;
     try {
       ws = new WebSocket(url, { rejectUnauthorized: false });
     } catch (err) {
-      console.error("[MMM-HomeAssistantStatusDashboard] Could not create WebSocket:", err.message);
+      Log.error("[MMM-HomeAssistantStatusDashboard] Could not create WebSocket:", err.message);
       this._scheduleReconnect();
       return;
     }
@@ -65,15 +68,16 @@ module.exports = NodeHelper.create({
 
     ws.on("close", (code) => {
       if (this.ws !== ws) return;  // stale socket
-      console.log(`[MMM-HomeAssistantStatusDashboard] WebSocket closed (${code})`);
+      Log.log(`[MMM-HomeAssistantStatusDashboard] WebSocket closed (${code})`);
       this.ws = null;
       this._stopHeartbeat();
       this.sendSocketNotification("HA_DISCONNECTED", {});
-      if (!this.stopping) this._scheduleReconnect();
+      // A rejected token is terminal — retrying just invites an HA IP ban
+      if (!this.stopping && !this.authFailed) this._scheduleReconnect();
     });
 
     ws.on("error", (err) => {
-      console.error("[MMM-HomeAssistantStatusDashboard] WebSocket error:", err.message);
+      Log.error("[MMM-HomeAssistantStatusDashboard] WebSocket error:", err.message);
       this.sendSocketNotification("HA_ERROR", { message: err.message });
       // 'close' fires after 'error', so reconnect is handled there
     });
@@ -91,7 +95,7 @@ module.exports = NodeHelper.create({
         break;
 
       case "auth_ok":
-        console.log("[MMM-HomeAssistantStatusDashboard] Authenticated. HA version:", msg.ha_version);
+        Log.log("[MMM-HomeAssistantStatusDashboard] Authenticated. HA version:", msg.ha_version);
         this.sendSocketNotification("HA_CONNECTED", { haVersion: msg.ha_version });
 
         // Fetch all current states as the initial snapshot
@@ -107,9 +111,10 @@ module.exports = NodeHelper.create({
         break;
 
       case "auth_invalid":
-        console.error("[MMM-HomeAssistantStatusDashboard] Auth rejected:", msg.message);
-        this.sendSocketNotification("HA_ERROR", { message: "Authentication failed: " + msg.message });
-        // No reconnect on auth failure — bad token won't self-heal
+        Log.error("[MMM-HomeAssistantStatusDashboard] Auth rejected:", msg.message);
+        // Terminal — a bad token won't self-heal, and HA can IP-ban repeated attempts
+        this.authFailed = true;
+        this.sendSocketNotification("HA_ERROR", { message: `Authentication failed: ${msg.message}` });
         break;
 
       case "result":
@@ -120,7 +125,7 @@ module.exports = NodeHelper.create({
             : msg.result;
           this.sendSocketNotification("HA_STATES", { states });
         } else if (!msg.success) {
-          console.warn("[MMM-HomeAssistantStatusDashboard] Command failed:", msg.error);
+          Log.warn("[MMM-HomeAssistantStatusDashboard] Command failed:", msg.error);
         }
         break;
 
@@ -141,7 +146,7 @@ module.exports = NodeHelper.create({
     try {
       this.ws.send(JSON.stringify(obj));
     } catch (err) {
-      console.error("[MMM-HomeAssistantStatusDashboard] Send error:", err.message);
+      Log.error("[MMM-HomeAssistantStatusDashboard] Send error:", err.message);
     }
   },
 
@@ -152,10 +157,10 @@ module.exports = NodeHelper.create({
     const interval = (this.cfg && this.cfg.heartbeatInterval) || 30000;
     this.heartbeatTimer = setInterval(() => {
       if (this.awaitingPong) {
-        console.warn("[MMM-HomeAssistantStatusDashboard] No pong from HA; reconnecting");
+        Log.warn("[MMM-HomeAssistantStatusDashboard] No pong from HA; reconnecting");
         this._stopHeartbeat();
         if (this.ws) {
-          try { this.ws.terminate(); } catch (_) {}
+          try { this.ws.terminate(); } catch (_) { /* socket may already be closed */ }
         }
         return;
       }
@@ -175,7 +180,7 @@ module.exports = NodeHelper.create({
   _scheduleReconnect() {
     if (this.reconnectTimer) return;
     const delay = (this.cfg && this.cfg.reconnectInterval) || 10000;
-    console.log(`[MMM-HomeAssistantStatusDashboard] Reconnecting in ${delay / 1000}s`);
+    Log.log(`[MMM-HomeAssistantStatusDashboard] Reconnecting in ${delay / 1000}s`);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       if (this.cfg && !this.stopping) this._connect();
@@ -190,7 +195,7 @@ module.exports = NodeHelper.create({
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      try { this.ws.terminate(); } catch (_) {}
+      try { this.ws.terminate(); } catch (_) { /* socket may already be closed */ }
       this.ws = null;
     }
   }

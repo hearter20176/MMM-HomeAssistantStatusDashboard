@@ -1,11 +1,16 @@
-// Mock ws before requiring node_helper so the real WebSocket is never opened
+// Mock ws before requiring node_helper so the real WebSocket is never opened.
+// `on` records handlers per-instance so tests can drive close/message events.
 jest.mock("ws", () => {
-  const MockWebSocket = jest.fn(() => ({
-    on: jest.fn(),
-    send: jest.fn(),
-    terminate: jest.fn(),
-    readyState: 1  // WebSocket.OPEN
-  }));
+  const MockWebSocket = jest.fn(() => {
+    const instance = {
+      _handlers: {},
+      send: jest.fn(),
+      terminate: jest.fn(),
+      readyState: 1  // WebSocket.OPEN
+    };
+    instance.on = jest.fn((event, cb) => { instance._handlers[event] = cb; });
+    return instance;
+  });
   MockWebSocket.OPEN = 1;
   return MockWebSocket;
 });
@@ -26,6 +31,7 @@ beforeEach(() => {
   helper.ws = null;
   helper.reconnectTimer = null;
   helper.stopping = false;
+  helper.authFailed = false;
 });
 
 afterEach(() => { helper._stopHeartbeat(); });
@@ -77,6 +83,11 @@ describe("_handleMessage", () => {
     const spy = jest.spyOn(helper, "_scheduleReconnect");
     helper._handleMessage(JSON.stringify({ type: "auth_invalid", message: "bad token" }));
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  test("auth_invalid sets authFailed so a later close does not reconnect", () => {
+    helper._handleMessage(JSON.stringify({ type: "auth_invalid", message: "bad token" }));
+    expect(helper.authFailed).toBe(true);
   });
 
   test("result with state array sends HA_STATES", () => {
@@ -172,12 +183,13 @@ describe("entity filtering", () => {
   afterEach(() => { helper.entityIds = null; });
 
   test("HA_CONNECT with entityIds limits forwarded states", () => {
+    const originalConnect = helper._connect;
     helper._connect = jest.fn();
     helper.socketNotificationReceived("HA_CONNECT", { ...helper.cfg, entityIds: ["sensor.a"] });
     const states = [{ entity_id: "sensor.a", state: "1" }, { entity_id: "sensor.b", state: "2" }];
     helper._handleMessage(JSON.stringify({ type: "result", success: true, result: states }));
     expect(helper.sendSocketNotification).toHaveBeenCalledWith("HA_STATES", { states: [states[0]] });
-    delete helper._connect;
+    helper._connect = originalConnect;
   });
 
   test("state_changed for an unconfigured entity is dropped", () => {
@@ -187,6 +199,44 @@ describe("entity filtering", () => {
       event: { event_type: "state_changed", data: { entity_id: "sensor.b", new_state: {}, old_state: {} } }
     }));
     expect(helper.sendSocketNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe("close handling (auth_invalid must be terminal)", () => {
+  test("close after auth_invalid does not schedule a reconnect", () => {
+    helper._connect();
+    const ws = WebSocket.mock.results[WebSocket.mock.results.length - 1].value;
+
+    helper._handleMessage(JSON.stringify({ type: "auth_invalid", message: "bad token" }));
+
+    const spy = jest.spyOn(helper, "_scheduleReconnect");
+    ws._handlers.close(1000);
+
+    expect(spy).not.toHaveBeenCalled();
+    expect(helper.reconnectTimer).toBeNull();
+  });
+
+  test("close without auth_invalid still schedules a reconnect", () => {
+    helper._connect();
+    const ws = WebSocket.mock.results[WebSocket.mock.results.length - 1].value;
+
+    const spy = jest.spyOn(helper, "_scheduleReconnect");
+    ws._handlers.close(1006);
+
+    expect(spy).toHaveBeenCalled();
+    // _scheduleReconnect really queues a setTimeout — clean it up so it
+    // doesn't leak past this test.
+    clearTimeout(helper.reconnectTimer);
+    helper.reconnectTimer = null;
+  });
+
+  test("HA_CONNECT clears a stale authFailed flag so future drops can reconnect", () => {
+    const originalConnect = helper._connect;
+    helper.authFailed = true;
+    helper._connect = jest.fn();
+    helper.socketNotificationReceived("HA_CONNECT", { ...helper.cfg });
+    expect(helper.authFailed).toBe(false);
+    helper._connect = originalConnect;
   });
 });
 

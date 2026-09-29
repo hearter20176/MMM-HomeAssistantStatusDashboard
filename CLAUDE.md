@@ -38,7 +38,7 @@ Socket notifications flowing **back→front**: `HA_CONNECTED`, `HA_DISCONNECTED`
 - **No auth retry.** `auth_invalid` stops reconnection — a bad token won't self-heal, so it's treated as terminal.
 - **Portrait display** — the physical monitor is rotated 90°. The default `tilesPerRow` is 3 (not 4) to suit the narrower column width. Avoid changes that assume landscape proportions.
 - **CSS class names are all prefixed `ha-`** to avoid collisions with other MM modules.
-- **Font Awesome 6** is required. It must live at `lib/fontawesome/` inside the module directory (or be symlinked from another module like MMM-GlassCalendar).
+- **Font Awesome** — the module uses MagicMirror's own vendored `font-awesome.css` (currently FA 7 free) via `getStyles()`. No local `lib/fontawesome/` copy or symlink is needed.
 
 ## State colour logic (`_getStateClass`)
 
@@ -69,11 +69,14 @@ Socket notifications flowing **back→front**: `HA_CONNECTED`, `HA_DISCONNECTED`
 
 ## Testing
 
-There is no automated test suite. To test:
+Automated: `npm install && npm test` (jest) inside the module directory. Two suites:
+- `__tests__/node_helper.test.js` — WebSocket lifecycle, auth, reconnect/close handling, heartbeat, entity filtering (mocks `ws` and `logger`).
+- `__tests__/module.helpers.test.js` — pure DOM/state helpers (`_isAlertState`, `_getStateClass`, `_formatState`, `_getDomainIcon`, `_isEntityHidden`, `_buildEntityGroups`, `_buildEntityTile`, `getDom`), plus `start()` config normalization. `jest.setup.js` stubs the MagicMirror browser globals and provides a jsdom `document` so DOM-building methods can run under Node.
+
+Manual, for anything the suites can't cover (real HA auth, actual reconnect timing on the network):
 1. Install in a real MagicMirror instance at `~/MagicMirror/modules/`
-2. Run `npm install` inside the module directory
-3. Add a config block to MagicMirror's `config.js` (see README for example)
-4. Start MagicMirror and verify tiles, alerts, and reconnect behaviour manually
+2. Add a config block to MagicMirror's `config.js` (see README for example)
+3. Start MagicMirror and verify tiles, alerts, and reconnect behaviour manually
 
 ## Things to watch out for
 

@@ -10,44 +10,44 @@ Uses the **Home Assistant WebSocket API** for near-instant state updates — no 
 
 ```text
 ╭────────────────────────────────────────╮
-│  ⌂  HOME ASSISTANT    ● HA 2024.3.0  │
+│  [home]  HOME ASSISTANT  [.] HA 2024.3.0 │
 ├────────────────────────────────────────┤
-│  🔔  Front Door: OPEN                 │
-│      Smoke (Kitchen): SMOKE!          │
+│  [!]  Front Door: OPEN                 │
+│       Smoke (Kitchen): SMOKE!          │
 ├────────────────────────────────────────┤
 │                                        │
 │  SECURITY                              │
 │  ┌───────●┐  ┌────────┐  ┌───────●┐  │
-│  │   🚪   │  │   🚪   │  │   🔥   │  │
+│  │ [door] │  │ [door] │  │ [fire] │  │
 │  │  OPEN  │  │ closed │  │ SMOKE! │  │
 │  │Fr. Door│  │Bk. Door│  │  Smoke │  │
 │  └────────┘  └────────┘  └────────┘  │
 │  ┌────────┐                           │
-│  │   🔒   │                           │
+│  │ [lock] │                           │
 │  │ locked │                           │
 │  │Fr. Lock│                           │
 │  └────────┘                           │
 │                                        │
 │  CLIMATE                               │
 │  ┌────────┐  ┌────────┐  ┌────────┐  │
-│  │   🌡   │  │   🌡   │  │   💧   │  │
+│  │[therm] │  │[therm] │  │[humid] │  │
 │  │22.5 °C │  │19.0 °C │  │  65 % │  │
 │  │Living  │  │Bedroom │  │Humidity│  │
 │  └────────┘  └────────┘  └────────┘  │
 │  ┌────────┐                           │
-│  │   ❄️   │                           │
+│  │[climate│                           │
 │  │heating │                           │
 │  │ Therm. │                           │
 │  └────────┘                           │
 │                                        │
 │  LIGHTS                                │
 │  ┌────────┐  ┌────────┐  ┌────────┐  │
-│  │   💡   │  │   💡   │  │   💡   │  │
+│  │[light] │  │[light] │  │[light] │  │
 │  │Festive │  │ Warmth │  │ Breeze │  │
 │  │Outdoor │  │Fr. Door│  │Lm. Post│  │
 │  └────────┘  └────────┘  └────────┘  │
 │  ┌────────┐  ┌────────┐               │
-│  │   💡   │  │   💡   │               │
+│  │[light] │  │[light] │               │
 │  │   on   │  │   off  │               │
 │  │Living  │  │Kitchen │               │
 │  └────────┘  └────────┘               │
@@ -239,7 +239,7 @@ Icons use the Font Awesome build that ships with MagicMirror² (`font-awesome.cs
 | `tilesPerRow` | number | `3` | CSS grid columns per group (3 suits a portrait/rotated display; use 4+ for landscape) |
 | `showAlertBanner` | boolean | `true` | Flashing banner at top when any entity is alerting |
 | `showMmAlert` | boolean | `true` | Send SHOW_ALERT to MagicMirror Alert module on new alert transitions |
-| `hideUnavailable` | boolean | `false` | Hide tiles for entities HA reports as unavailable |
+| `hideUnavailable` | boolean | `false` | Hide tiles for entities missing from HA, or that HA reports as `unavailable`/`unknown` |
 | `showLastUpdated` | boolean | `true` | Timestamp footer showing last state change received |
 | `showConnectionStatus` | boolean | `true` | Connection dot + HA version in header |
 | `theme` | string | `"dark"` | `"dark"` or `"light"` |
@@ -252,7 +252,7 @@ Icons use the Font Awesome build that ships with MagicMirror² (`font-awesome.cs
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `entity_id` | string | ✅ | Home Assistant entity ID (e.g. `binary_sensor.front_door`) |
+| `entity_id` | string | yes | Home Assistant entity ID (e.g. `binary_sensor.front_door`) |
 | `name` | string | | Display name; falls back to HA `friendly_name` then entity slug |
 | `group` | string | | Group label for the tile; ungrouped entities appear under "Other" |
 | `icon` | string | | Font Awesome class override (e.g. `"fa-solid fa-door-open"`); auto-detected from domain/device_class if omitted |

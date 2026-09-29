@@ -3,8 +3,6 @@
  * Uses HA WebSocket API for near real-time state updates and alerting.
  */
 
-/* global Module, Log, config */
-
 Module.register("MMM-HomeAssistantStatusDashboard", {
 
   defaults: {
@@ -69,6 +67,12 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     this.error = null;
     this.loaded = false;
     this.renderTimer = null;
+
+    // Defensive against a malformed config: a non-array `entities`, or entries
+    // missing a string entity_id, would otherwise throw deep inside getDom().
+    this.config.entities = (Array.isArray(this.config.entities) ? this.config.entities : [])
+      .filter(ec => ec && typeof ec.entity_id === "string");
+
     this.entityIds = new Set(this.config.entities.map(ec => ec.entity_id));
 
     if (this.config.haUrl && this.config.token) {
@@ -145,10 +149,10 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
 
       case "HA_ERROR":
         this.error = payload.message;
-        if (!this.loaded) {
-          this.loaded = true;
-          this.updateDom(this.config.animationSpeed);
-        }
+        this.loaded = true;
+        // Re-render even after the first load — a token revoked mid-run or a
+        // reconnect failure must surface, not just sit in `this.error` unseen.
+        this.updateDom(this.config.animationSpeed);
         break;
     }
   },
@@ -185,9 +189,19 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
       return wrapper;
     }
 
-    if (this.error && !this.connected && Object.keys(this.states).length === 0) {
+    const hasStates = Object.keys(this.states).length > 0;
+
+    if (this.error && !hasStates) {
       card.appendChild(this._buildError(this.error));
       return wrapper;
+    }
+
+    if (this.error && hasStates) {
+      // Don't blow away tiles that already loaded — show a compact strip
+      // under the header instead so stale data stays visible with a warning.
+      const strip = this._buildError(this.error);
+      strip.classList.add("ha-error-strip");
+      card.appendChild(strip);
     }
 
     if (this.config.showAlertBanner) {
@@ -213,7 +227,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     const icon = document.createElement("i");
     icon.className = "fa-solid fa-house-signal";
     title.appendChild(icon);
-    title.appendChild(document.createTextNode(" " + this.config.header));
+    title.appendChild(document.createTextNode(` ${this.config.header}`));
     header.appendChild(title);
 
     if (this.config.showConnectionStatus) {
@@ -263,6 +277,13 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     return banner;
   },
 
+  // hideUnavailable hides both entities missing from HA and ones HA itself
+  // reports as unavailable/unknown (see README).
+  _isEntityHidden(state) {
+    if (!this.config.hideUnavailable) return false;
+    return !state || state.state === "unavailable" || state.state === "unknown";
+  },
+
   _buildEntityGroups() {
     const container = document.createElement("div");
     container.className = "ha-groups-container";
@@ -283,15 +304,10 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
         .sort()
     ];
 
+    let tileCount = 0;
+
     ordered.forEach(groupName => {
       const entities = groupMap[groupName];
-      const groupEl = document.createElement("div");
-      groupEl.className = "ha-group";
-
-      const groupHeader = document.createElement("div");
-      groupHeader.className = "ha-group-header";
-      groupHeader.textContent = groupName;
-      groupEl.appendChild(groupHeader);
 
       const grid = document.createElement("div");
       grid.className = "ha-entity-grid";
@@ -300,13 +316,35 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
 
       entities.forEach(ec => {
         const state = this.states[ec.entity_id];
-        if (!state && this.config.hideUnavailable) return;
+        if (this._isEntityHidden(state)) return;
         grid.appendChild(this._buildEntityTile(ec, state));
+        tileCount++;
       });
+
+      // A group left with nothing visible (e.g. all hidden) shouldn't render
+      // an empty header + grid.
+      if (grid.children.length === 0) return;
+
+      const groupEl = document.createElement("div");
+      groupEl.className = "ha-group";
+
+      const groupHeader = document.createElement("div");
+      groupHeader.className = "ha-group-header";
+      groupHeader.textContent = groupName;
+      groupEl.appendChild(groupHeader);
 
       groupEl.appendChild(grid);
       container.appendChild(groupEl);
     });
+
+    if (tileCount === 0) {
+      const empty = document.createElement("div");
+      empty.className = "ha-loading";
+      empty.textContent = this.config.entities.length === 0
+        ? "No entities configured"
+        : "All entities hidden";
+      container.appendChild(empty);
+    }
 
     return container;
   },
@@ -347,7 +385,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     nameEl.title = entityConfig.entity_id;  // full id on hover
     const displayName = entityConfig.name ||
       (state && state.attributes && state.attributes.friendly_name) ||
-      entityConfig.entity_id.split(".")[1].replace(/_/g, " ");
+      (entityConfig.entity_id.split(".")[1] || entityConfig.entity_id).replace(/_/g, " ");
     nameEl.textContent = displayName;
     tile.appendChild(nameEl);
 
@@ -360,7 +398,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     const spinner = document.createElement("span");
     spinner.className = "ha-spinner";
     el.appendChild(spinner);
-    el.appendChild(document.createTextNode(" " + message));
+    el.appendChild(document.createTextNode(` ${message}`));
     return el;
   },
 
@@ -370,7 +408,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     const icon = document.createElement("i");
     icon.className = "fa-solid fa-triangle-exclamation";
     el.appendChild(icon);
-    el.appendChild(document.createTextNode(" " + message));
+    el.appendChild(document.createTextNode(` ${message}`));
     return el;
   },
 
@@ -439,7 +477,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
   _formatState(entityConfig, state) {
     if (!state) return "N/A";
     const s = state.state;
-    if (entityConfig.stateLabels && entityConfig.stateLabels[s] != null) {
+    if (entityConfig.stateLabels && entityConfig.stateLabels[s] !== null && entityConfig.stateLabels[s] !== undefined) {
       return String(entityConfig.stateLabels[s]);
     }
     if (s === "unavailable") return "Offline";
@@ -448,7 +486,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     // Show a specific attribute (e.g. "effect" for a light's current scene)
     if (entityConfig.attribute) {
       const val = state.attributes && state.attributes[entityConfig.attribute];
-      if (val != null && val !== "") return String(val);
+      if (val !== null && val !== undefined && val !== "") return String(val);
     }
 
     const num = parseFloat(s);

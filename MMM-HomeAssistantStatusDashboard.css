@@ -102,8 +102,11 @@
   font-size: 0.65rem;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* var()s fall back to the original dark-theme values; a shared theme
+     stylesheet can override --mm-tile-strong/--mm-border for day mode
+     without this module needing to know about body.mm-day. */
+  background: var(--mm-tile-strong, rgb(0 0 0 / 30%));
+  border: 1px solid var(--mm-border, rgb(255 255 255 / 8%));
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -361,8 +364,10 @@
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: rgba(255, 255, 255, 0.85);
+  /* currentcolor tracks the surrounding text colour so the spinner stays
+     visible whether the theme text is set light (night) or dark (day). */
+  border: 2px solid color-mix(in srgb, currentcolor 25%, transparent);
+  border-top-color: currentcolor;
   border-radius: 50%;
   animation: ha-spin 0.7s linear infinite;
   flex-shrink: 0;
@@ -382,6 +387,15 @@
 .ha-error i {
   color: #ef4444;
   margin-right: 7px;
+}
+
+/* Compact variant used under the header when an error arrives after tiles
+   have already loaded — the full-panel .ha-error only shows before any
+   state has ever loaded. */
+.ha-error-strip {
+  padding: 6px 4px 10px;
+  text-align: left;
+  font-size: 0.7rem;
 }
 
 /* ============================================================
