@@ -62,6 +62,7 @@ Uses the **Home Assistant WebSocket API** for near-instant state updates — no 
 |---|---|
 | Red border + pulsing glow + `●` corner dot | Alert condition met (`alertWhen` / `alertAbove` / `alertBelow`) |
 | Blue icon glow | Active state — `on`, `locked`, `home`, `detected`, … |
+| Blue icon (same blue), in the "Readings" group | Data reading — temperature, humidity, radon level, … (see `kind`) |
 | Amber icon | Transitional state — `opening`, `closing`, `arming`, … |
 | Dimmed tile | Inactive state — `off`, `closed`, `idle`, … |
 | Faded tile | Entity unavailable or unknown in HA |
@@ -91,7 +92,7 @@ The **alert banner** (top strip) appears whenever any entity is alerting and lis
 cd ~/MagicMirror/modules
 # Copy or symlink this folder here, then:
 cd MMM-HomeAssistantStatusDashboard
-npm install
+npm install --omit=dev
 ```
 
 ### Font Awesome
@@ -236,6 +237,7 @@ Icons use the Font Awesome build that ships with MagicMirror² (`font-awesome.cs
 | `token` | string | `""` | Long-lived access token |
 | `entities` | array | `[]` | Entity configs — see below |
 | `groupOrder` | array | `[]` | Ordered list of group names; unlisted groups appended alphabetically |
+| `readingsGroup` | string \| false | `"Readings"` | Group that collects every data-reporting ("reading") entity regardless of its `group`. Placed per `groupOrder` if listed there, otherwise after all other groups. `false`, `null`, `""` or whitespace-only disables the regrouping (readings stay in their own groups, still blue); `true` means `"Readings"`; any other non-string value logs a warning and uses `"Readings"` |
 | `tilesPerRow` | number | `3` | CSS grid columns per group (3 suits a portrait/rotated display; use 4+ for landscape) |
 | `showAlertBanner` | boolean | `true` | Flashing banner at top when any entity is alerting |
 | `showMmAlert` | boolean | `true` | Send SHOW_ALERT to MagicMirror Alert module on new alert transitions |
@@ -257,10 +259,11 @@ Icons use the Font Awesome build that ships with MagicMirror² (`font-awesome.cs
 | `group` | string | | Group label for the tile; ungrouped entities appear under "Other" |
 | `icon` | string | | Font Awesome class override (e.g. `"fa-solid fa-door-open"`); auto-detected from domain/device_class if omitted |
 | `alertWhen` | string | | Alert when `state === alertWhen` (e.g. `"on"`, `"unlocked"`) |
+| `kind` | `"reading"` \| `"status"` | auto | Whether the tile reports data (blue, shown in `readingsGroup`) or has meaningful states (active/warn/alert/inactive colours, stays in `group`). Explicit value always wins. When omitted: an entity is a reading if HA gives it a `unit_of_measurement`, a `state_class` of `measurement`/`total`/`total_increasing`, or a numeric state, and the config has no `activeStates`, `warnStates` (non-empty) or `alertWhen`. `alertAbove`/`alertBelow` do not make an entity a status entity. An offline sensor keeps its last known kind |
 | `alertAbove` | number | | Alert when numeric state exceeds this value |
 | `alertBelow` | number | | Alert when numeric state falls below this value |
 | `alertLabel` | string | | Text shown in alert banner and MM alert instead of raw state (e.g. `"OPEN"`) |
-| `unit` | string | | Unit suffix override; falls back to HA `unit_of_measurement` attribute |
+| `unit` | string | | Unit suffix override; falls back to HA `unit_of_measurement` attribute. Readings show the value with its unit (`58 °F`, `1.8 pCi/L`), rounded to one decimal with a trailing `.0` dropped, or to HA's `display_precision` when HA sends one |
 | `attribute` | string | | HA attribute to display as the tile value instead of the raw state (e.g. `"effect"` to show a light's current scene/theme). Alert conditions and the active/inactive colour class still use the main entity state. Falls back to the raw state if the attribute is absent or empty. |
 | `activeStates` | string[] | | States shown as active (blue); replaces the built-in list for this entity (e.g. `["locked"]`). Case-insensitive |
 | `warnStates` | string[] | | States shown as warning (amber); replaces the built-in list. `[]` disables warn for the entity |

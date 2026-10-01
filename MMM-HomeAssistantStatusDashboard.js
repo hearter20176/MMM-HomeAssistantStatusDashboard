@@ -16,6 +16,11 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     // Ordered list of group names; unordered groups appended after
     groupOrder: [],
 
+    // Group that collects data-reporting ("reading") entities such as
+    // temperature or radon level, whatever their configured `group`.
+    // false/null disables the regrouping. Placed per groupOrder, else last.
+    readingsGroup: "Readings",
+
     // Number of tile columns in each group grid (3 suits a portrait/rotated display)
     tilesPerRow: 3,
 
@@ -67,6 +72,7 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     this.error = null;
     this.loaded = false;
     this.renderTimer = null;
+    this.kindCache = {};       // entity_id → last known "reading" | "status"
 
     // Defensive against a malformed config: a non-array `entities`, or entries
     // missing a string entity_id, would otherwise throw deep inside getDom().
@@ -288,20 +294,27 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     const container = document.createElement("div");
     container.className = "ha-groups-container";
 
-    // Bucket entities into groups
+    const groupOrder = Array.isArray(this.config.groupOrder) ? this.config.groupOrder : [];
+    const readingsGroup = this._getReadingsGroup();
+
+    // Bucket entities into groups; readings are pulled into their own group
     const groupMap = {};
     this.config.entities.forEach(ec => {
-      const g = ec.group || "Other";
+      const isReading = readingsGroup && this._getKind(ec, this.states[ec.entity_id]) === "reading";
+      const g = isReading ? readingsGroup : (ec.group || "Other");
       if (!groupMap[g]) groupMap[g] = [];
       groupMap[g].push(ec);
     });
 
-    // Respect groupOrder; append unlisted groups alphabetically
+    // Respect groupOrder; append unlisted groups alphabetically, with the
+    // readings group (if not listed in groupOrder) after all of them
     const ordered = [
-      ...this.config.groupOrder.filter(g => groupMap[g]),
+      ...groupOrder.filter(g => groupMap[g]),
       ...Object.keys(groupMap)
-        .filter(g => !this.config.groupOrder.includes(g))
-        .sort()
+        .filter(g => !groupOrder.includes(g) && g !== readingsGroup)
+        .sort(),
+      ...(readingsGroup && groupMap[readingsGroup] && !groupOrder.includes(readingsGroup)
+        ? [readingsGroup] : [])
     ];
 
     let tileCount = 0;
@@ -459,6 +472,14 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     // Per-entity lists replace the defaults (warnStates: [] disables warn)
     const lower = s.toLowerCase();
     const matches = list => list.some(v => String(v).toLowerCase() === lower);
+
+    // Readings only report data: blue unless an explicit warnStates entry hits
+    if (this._getKind(entityConfig, state) === "reading") {
+      if (this._hasList(entityConfig.warnStates) && matches(entityConfig.warnStates)) {
+        return "ha-state-warn";
+      }
+      return "ha-state-reading";
+    }
     const warnStates = Array.isArray(entityConfig.warnStates)
       ? entityConfig.warnStates
       : ["opening", "closing", "pending", "arming", "triggered"];
@@ -493,11 +514,88 @@ Module.register("MMM-HomeAssistantStatusDashboard", {
     if (!isNaN(num) && s.trim() !== "") {
       const unit = entityConfig.unit ||
         (state.attributes && state.attributes.unit_of_measurement) || "";
-      const formatted = Number.isInteger(num) ? num : parseFloat(num.toFixed(1));
-      return unit ? `${formatted}\u202f${unit}` : String(formatted);
+      if (this._getKind(entityConfig, state) !== "reading") {
+        const formatted = Number.isInteger(num) ? num : parseFloat(num.toFixed(1));
+        return unit ? `${formatted}\u202f${unit}` : String(formatted);
+      }
+      // Readings use the same strict parse as classification; anything it
+      // rejects ("Infinity", "0x1A") falls through to the text path below
+      const strict = this._parseFinite(s);
+      if (strict !== null) {
+        const formatted = this._formatReading(strict, state.attributes);
+        return unit ? `${formatted}\u202f${unit}` : formatted;
+      }
     }
 
     return this._humanizeState(entityConfig.entity_id, s, state.attributes || {});
+  },
+
+  // Honour HA's display precision when it is sent; otherwise round to one
+  // decimal and drop a trailing zero ("58.0" -> "58", "1.84" -> "1.8")
+  _formatReading(num, attributes) {
+    const attrs = attributes || {};
+    const p = [attrs.display_precision, attrs.suggested_display_precision]
+      .find(v => Number.isInteger(v) && v >= 0 && v <= 20);
+    const text = p !== undefined ? num.toFixed(p) : String(parseFloat(num.toFixed(1)));
+    // "-0.4" at precision 0 would otherwise read "-0"
+    return parseFloat(text) === 0 ? text.replace(/^-/, "") : text;
+  },
+
+  // Plain decimal notation only: rejects hex, "Infinity", and values that
+  // overflow to Infinity. Returns null when the string is not a usable number.
+  _parseFinite(s) {
+    if (typeof s !== "string") return null;
+    const t = s.trim();
+    if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(t)) return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  },
+
+  _hasList(list) {
+    return Array.isArray(list) && list.length > 0;
+  },
+
+  _getReadingsGroup() {
+    const g = this.config && this.config.readingsGroup;
+    if (typeof g === "string") return g.trim() !== "" ? g : null;
+    if (g === true) return "Readings";
+    if (g === false || g === null || g === undefined) return null;
+    if (!this.warnedReadingsGroup) {
+      this.warnedReadingsGroup = true;
+      Log.warn(`[${this.name}] readingsGroup must be a string or false; using "Readings"`);
+    }
+    return "Readings";
+  },
+
+  // "reading" = entity that reports data; "status" = entity with meaningful
+  // states. Explicit `kind` wins. Otherwise a reading has a unit, a
+  // measurement-like state_class, or a numeric state, and no state lists
+  // (alertAbove/alertBelow are thresholds, not status semantics; an empty
+  // warnStates just disables the default warn list).
+  _getKind(entityConfig, state) {
+    if (entityConfig.kind === "reading" || entityConfig.kind === "status") return entityConfig.kind;
+
+    const id = entityConfig.entity_id;
+    if (this._hasList(entityConfig.activeStates) || this._hasList(entityConfig.warnStates) ||
+      entityConfig.alertWhen !== undefined) {
+      return "status";
+    }
+    if (!this.kindCache) this.kindCache = {};
+
+    const s = state && state.state;
+    const gone = !state || s === "unavailable" || s === "unknown";
+    const attrs = (state && state.attributes) || {};
+    const hasUnit = typeof attrs.unit_of_measurement === "string" && attrs.unit_of_measurement !== "";
+    const measured = ["measurement", "total", "total_increasing"].includes(attrs.state_class);
+
+    // An offline sensor keeps its last known kind so its tile doesn't hop groups
+    if (gone && !hasUnit && !measured) return this.kindCache[id] || "status";
+
+    // HA enum sensors are status by definition (a "2" there is a code, not a measurement)
+    const numeric = !gone && attrs.device_class !== "enum" && this._parseFinite(s) !== null;
+    const kind = hasUnit || measured || numeric ? "reading" : "status";
+    this.kindCache[id] = kind;
+    return kind;
   },
 
   // Turn raw HA states ("heat_cool", "power_off", binary "on") into display text

@@ -244,11 +244,13 @@
 
 /* State colour variants */
 
-.ha-state-active {
+.ha-state-active,
+.ha-state-reading {
   border-color: rgba(56, 189, 248, 0.32);
 }
 
-.ha-state-active .ha-tile-icon i {
+.ha-state-active .ha-tile-icon i,
+.ha-state-reading .ha-tile-icon i {
   color: #38bdf8;
   filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
 }
