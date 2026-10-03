@@ -8,53 +8,13 @@ Uses the **Home Assistant WebSocket API** for near-instant state updates — no 
 
 ## Preview
 
-```text
-╭────────────────────────────────────────╮
-│  [home]  HOME ASSISTANT  [.] HA 2024.3.0 │
-├────────────────────────────────────────┤
-│  [!]  Front Door: OPEN                 │
-│       Smoke (Kitchen): SMOKE!          │
-├────────────────────────────────────────┤
-│                                        │
-│  SECURITY                              │
-│  ┌───────●┐  ┌────────┐  ┌───────●┐  │
-│  │ [door] │  │ [door] │  │ [fire] │  │
-│  │  OPEN  │  │ closed │  │ SMOKE! │  │
-│  │Fr. Door│  │Bk. Door│  │  Smoke │  │
-│  └────────┘  └────────┘  └────────┘  │
-│  ┌────────┐                           │
-│  │ [lock] │                           │
-│  │ locked │                           │
-│  │Fr. Lock│                           │
-│  └────────┘                           │
-│                                        │
-│  CLIMATE                               │
-│  ┌────────┐  ┌────────┐  ┌────────┐  │
-│  │[therm] │  │[therm] │  │[humid] │  │
-│  │22.5 °C │  │19.0 °C │  │  65 % │  │
-│  │Living  │  │Bedroom │  │Humidity│  │
-│  └────────┘  └────────┘  └────────┘  │
-│  ┌────────┐                           │
-│  │[climate│                           │
-│  │heating │                           │
-│  │ Therm. │                           │
-│  └────────┘                           │
-│                                        │
-│  LIGHTS                                │
-│  ┌────────┐  ┌────────┐  ┌────────┐  │
-│  │[light] │  │[light] │  │[light] │  │
-│  │Festive │  │ Warmth │  │ Breeze │  │
-│  │Outdoor │  │Fr. Door│  │Lm. Post│  │
-│  └────────┘  └────────┘  └────────┘  │
-│  ┌────────┐  ┌────────┐               │
-│  │[light] │  │[light] │               │
-│  │   on   │  │   off  │               │
-│  │Living  │  │Kitchen │               │
-│  └────────┘  └────────┘               │
-│                                        │
-│                   Updated 14:32:01    │
-╰────────────────────────────────────────╯
-```
+<p align="center">
+  <img src="docs/screenshot.png" width="540" alt="Dashboard with Security, Appliances and Readings groups"/>
+</p>
+
+*Night theme with sample entities: status tiles grouped by `group` (an active alarm in blue, a dryer
+running in amber, inactive tiles dimmed), and data-reporting entities collected in the blue
+Readings group.*
 
 **Visual state key (colour-coded in the live display):**
 
@@ -286,3 +246,7 @@ The module auto-selects a Font Awesome icon based on the entity's domain and HA 
 Supported domains: `binary_sensor`, `sensor`, `switch`, `light`, `climate`, `lock`, `cover`, `media_player`, `person`, `device_tracker`, `automation`, `script`, `scene`, `input_boolean`, `input_number`, `input_select`, `vacuum`, `fan`, `camera`, `weather`, `alarm_control_panel`, `water_heater`, `number`, `button`, `update`, `group`.
 
 Device-class overrides: `motion`, `door`, `window`, `smoke`, `moisture`, `gas`, `battery`, `connectivity`, `occupancy`, `power`, `temperature`, `humidity`, `pressure`, and more.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
