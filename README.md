@@ -61,6 +61,16 @@ Icons use the Font Awesome build that ships with MagicMirror² (`font-awesome.cs
 
 ---
 
+## Update
+
+```bash
+cd ~/MagicMirror/modules/MMM-HomeAssistantStatusDashboard
+git pull
+npm install --omit=dev
+```
+
+Then restart MagicMirror (for example `pm2 restart MagicMirror`).
+
 ## Home Assistant: Long-Lived Access Token
 
 1. In HA, go to **Profile → Security → Long-Lived Access Tokens**
@@ -183,7 +193,7 @@ Icons use the Font Awesome build that ships with MagicMirror² (`font-awesome.cs
       }
     ]
   }
-}
+},
 ```
 
 ---

@@ -388,7 +388,7 @@ describe("threshold alert on a reading", () => {
     change("4.3");
     const banner = mod._buildAlertBanner();
     expect(banner).not.toBeNull();
-    expect(banner.textContent).toMatch(/4\.3 pCi\/L/);
+    expect(banner.textContent).toMatch(/4\.3\u202FpCi\/L/);
   });
 
   test("a reading below threshold produces no banner", () => {

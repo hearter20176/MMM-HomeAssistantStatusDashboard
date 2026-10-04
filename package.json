@@ -2,16 +2,36 @@
   "name": "mmm-homeassistantstatusdashboard",
   "version": "1.0.0",
   "description": "MagicMirror² module: Home Assistant status dashboard with real-time alerting via WebSocket",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hearter20176/MMM-HomeAssistantStatusDashboard.git"
+  },
+  "homepage": "https://github.com/hearter20176/MMM-HomeAssistantStatusDashboard#readme",
+  "bugs": {
+    "url": "https://github.com/hearter20176/MMM-HomeAssistantStatusDashboard/issues"
+  },
+  "author": "hearter20176",
+  "keywords": [
+    "MagicMirror",
+    "home-assistant",
+    "dashboard",
+    "smart-home",
+    "websocket"
+  ],
   "main": "MMM-HomeAssistantStatusDashboard.js",
   "license": "MIT",
   "scripts": {
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "lint": "eslint ."
   },
   "dependencies": {
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
     "jest": "^29.0.0",
     "jsdom": "^24.1.3"
   },
