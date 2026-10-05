@@ -50,7 +50,7 @@ The **alert banner** (top strip) appears whenever any entity is alerting and lis
 
 ```bash
 cd ~/MagicMirror/modules
-# Copy or symlink this folder here, then:
+git clone https://github.com/hearter20176/MMM-HomeAssistantStatusDashboard
 cd MMM-HomeAssistantStatusDashboard
 npm install --omit=dev
 ```
@@ -81,7 +81,9 @@ Then restart MagicMirror (for example `pm2 restart MagicMirror`).
 
 ---
 
-## MagicMirror `config.js` example
+## Configuration
+
+Example entry for the `modules` array in `config/config.js`:
 
 ```js
 {
