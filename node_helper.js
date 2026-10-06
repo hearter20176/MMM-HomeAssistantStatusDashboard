@@ -39,7 +39,7 @@ module.exports = NodeHelper.create({
 
   _connect() {
     if (this.ws) {
-      try { this.ws.terminate(); } catch (_) { /* socket may already be closed */ }
+      try { this.ws.terminate(); } catch { /* socket may already be closed */ }
       this.ws = null;
     }
 
@@ -85,7 +85,7 @@ module.exports = NodeHelper.create({
 
   _handleMessage(raw) {
     let msg;
-    try { msg = JSON.parse(raw); } catch (_) { return; }
+    try { msg = JSON.parse(raw); } catch { return; }
 
     switch (msg.type) {
 
@@ -160,7 +160,7 @@ module.exports = NodeHelper.create({
         Log.warn("[MMM-HomeAssistantStatusDashboard] No pong from HA; reconnecting");
         this._stopHeartbeat();
         if (this.ws) {
-          try { this.ws.terminate(); } catch (_) { /* socket may already be closed */ }
+          try { this.ws.terminate(); } catch { /* socket may already be closed */ }
         }
         return;
       }
@@ -195,7 +195,7 @@ module.exports = NodeHelper.create({
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      try { this.ws.terminate(); } catch (_) { /* socket may already be closed */ }
+      try { this.ws.terminate(); } catch { /* socket may already be closed */ }
       this.ws = null;
     }
   }

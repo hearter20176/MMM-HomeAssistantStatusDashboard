@@ -75,7 +75,7 @@ Per-entity `kind: "reading" | "status"` wins. Otherwise an entity is a reading w
 
 ## Testing
 
-Automated: `npm install && npm test` (jest) inside the module directory. Four suites (`jsdom` is a devDependency; jest's node environment has no DOM without it):
+Automated: `npm install && npm test` (jest) inside the module directory. Four suites (`jsdom` is a devDependency; jest's node environment has no DOM without it. jsdom 30 depends on ES-module-only packages, so `npm test` runs Jest under `node --experimental-vm-modules`; plain `npx jest` fails):
 - `__tests__/node_helper.test.js` — WebSocket lifecycle, auth, reconnect/close handling, heartbeat, entity filtering (mocks `ws` and `logger`).
 - `__tests__/node_helper.attributes.test.js` — state attributes (unit, state_class, device_class) pass through the helper intact.
 - `__tests__/readings.test.js` — reading/status classification of the live entities, grouping/ordering, reading formatting, threshold alert transitions.

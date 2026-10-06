@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ESLint 10, with `defineConfig` in `eslint.config.mjs`; `npm run lint` runs `eslint` without the trailing `.`.
 - README: `git clone` install instructions and a `## Configuration` heading for the config example.
+- Updated `ws` to 8.22, and the test tooling to `jest` 30 and `jsdom` 30. `npm test` runs Jest under `node --experimental-vm-modules`, which jsdom 30's ES-module dependencies need.
+- `package.json`: `"type": "commonjs"`.
+- ESLint reports unused catch bindings and arguments, and lints `package.json`, as modules.magicmirror.builders does.
 
 ## [1.0.0]
 
